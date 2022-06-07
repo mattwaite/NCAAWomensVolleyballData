@@ -53,7 +53,7 @@ for (i in playermatchurls){
   
   playercareerstats <- playerpage %>% html_nodes(xpath = '/html/body/div[2]/table') %>% html_table()
   
-  playercareerstats <- playercareerstats[[1]] %>% slice(3:n())  %>% row_to_names(row_number = 1) %>% remove_empty(which="cols") %>% clean_names() %>% mutate(team = schoolfull, player = playerfull) %>% mutate_at(vars(-year, -team, -player), ~str_replace(., ",", "")) %>% mutate_at(vars(-year, -team, -player), as.numeric) %>% separate(player, into=c("player", "remaining"), sep=" #") %>% separate(remaining, into=c("jersey", "position"), sep=" ") %>% select(year, team, player, jersey, position, everything())
+  playercareerstats <- playercareerstats[[1]] %>% slice(3:n())  %>% row_to_names(row_number = 1) %>% remove_empty(which="cols") %>% clean_names() %>% mutate(player = playerfull) %>% mutate_at(vars(-year, -team, -player), ~str_replace(., ",", "")) %>% mutate_at(vars(-year, -team, -player), as.numeric) %>% separate(player, into=c("player", "remaining"), sep=" #") %>% separate(remaining, into=c("jersey", "position"), sep=" ") %>% select(year, team, player, jersey, position, everything())
   
   playermatchstats <- playerpage %>% html_nodes(xpath = '/html/body/div[2]/div[3]/table') %>% html_table()
   
