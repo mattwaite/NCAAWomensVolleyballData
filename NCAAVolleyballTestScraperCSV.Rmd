@@ -1,0 +1,68 @@
+# Scrape using CSVs
+
+This method uses a manual process to pull up the Trends tab and navigate to the Institution page to get all Division I school season stats. Each institution is linked. The table is not addressable by URL in Rvest -- it requires session variables to pull up. So I copy and paste it into Google Sheets, extract the URL using a macro, and export it as a CSV. This method reads the CSV, pulls the url into a list and then loops through it to scrape each school. 
+
+This file exists to be able to debug scrapers incrementally using the notebook's block formatting. Steps can be cut out, tested and improved then cycled back into the scripts. The scripts are doing the scraping -- I use R Studio jobs to run them in the background. 
+
+
+```{r}
+library(tidyverse)
+library(lubridate)
+library(rvest)
+library(janitor)
+```
+
+```{r}
+urls <- read_csv("url_csvs/NCAA Volleyball - 2018.csv") %>% pull(1)
+```
+
+```{r}
+root_url <- "https://stats.ncaa.org"
+season = "2018"
+playerstatstibble = tibble()
+gamestatstibble = tibble()
+
+playerstatsfilename <- paste0("ncaa_volleyball_playerstats_", season, ".csv")
+gamestatsfilename <- paste0("ncaa_volleyball_gamestats_", season, ".csv")
+```
+
+```{r}
+for (i in urls){
+
+schoolpage <- i %>% read_html()
+
+schoolfull <- schoolpage %>% html_nodes(xpath = '//*[@id="contentarea"]/fieldset[1]/legend/a[1]') %>% html_text()
+
+roster_url <- schoolpage %>% html_nodes(xpath = '//*[@id="contentarea"]/a[1]') %>% html_attr('href')
+
+playerstats_url <- schoolpage %>% html_nodes(xpath = '//*[@id="contentarea"]/a[2]') %>% html_attr('href')
+
+gamestats_url <- schoolpage %>% html_nodes(xpath = '//*[@id="contentarea"]/a[3]') %>% html_attr('href')
+
+playerstats <- paste(root_url, playerstats_url, sep="") %>% read_html() %>% html_nodes(xpath = '//*[@id="stat_grid"]') %>% html_table()
+
+tryCatch(playerstats <- playerstats[[1]] %>% filter(Player != "TEAM" & Player != "Totals" & Player != "Opponent Totals") %>% mutate(RosterName = Player) %>% separate(Player, into=c("LastName", "FirstName"), sep=",") %>% mutate(FullName = paste(FirstName, LastName, sep=" ")) %>% separate(Ht, into=c("Feet", "Inches"), sep="-") %>% mutate(Team = schoolfull, Season=season) %>% clean_names() %>% select(team, season, jersey, full_name, roster_name, everything()) %>% mutate_at(10:31, ~str_replace(., ",", "")) %>%  mutate_at(10:31, as.numeric),
+    error = function(e){NA})
+
+tryCatch(playerstatstibble <- bind_rows(playerstatstibble, playerstats),
+    error = function(e){NA})
+
+gamepage <- paste(root_url, gamestats_url, sep="") %>% read_html() 
+
+games <- gamepage %>% html_nodes(xpath = '//*[@id="game_breakdown_div"]/table') %>% html_table(fill=TRUE)
+
+tryCatch(games <- games[[1]] %>% slice(3:n()) %>% filter(X2 != "Defensive Totals") %>% row_to_names(row_number = 1) %>% remove_empty(which="cols") %>% mutate(Date = mdy(Date), HomeAway = case_when(grepl("@",Opponent) ~ "Away", TRUE ~ "Home"), Opponent = gsub("@ ","",Opponent), WinLoss = case_when(grepl("L", Result) ~ "Loss", grepl("W", Result) ~ "Win"), Result = gsub("L ", "", Result), Result = gsub("W ", "", Result)) %>% separate(Result, into=c("VisitorScore", "HomeScore")) %>% rename(Result = WinLoss) %>% mutate(Team = schoolfull) %>% select(Date, Team, Opponent, HomeAway, Result, everything()) %>% clean_names() %>% mutate_at(vars(-date, -opponent, -home_away, -result, -team), ~str_replace(., "/", "")) %>% mutate_at(vars(-date, -opponent, -home_away, -result, -team), as.numeric),
+    error = function(e){NA})
+
+tryCatch(gamestatstibble <- bind_rows(gamestatstibble, games),
+    error = function(e){NA})
+
+Sys.sleep(2)
+}
+
+playerstatstibble <- playerstatstibble %>% remove_empty(which="rows")
+gamestatstibble <- gamestatstibble %>% remove_empty(which="rows")
+
+write_csv(playerstatstibble, playerstatsfilename)
+write_csv(gamestatstibble, gamestatsfilename)
+```
