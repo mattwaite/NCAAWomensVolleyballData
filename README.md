@@ -1,6 +1,6 @@
-# NCAA Womens Volleyball Data
+# NCAA Women's Volleyball Data
 
-A repository of NCAA womens volleyball data scraped from stats.ncaa.org, including the scrapers written in R.
+A repository of NCAA women's volleyball data scraped from stats.ncaa.org, including the scrapers written in R.
 
 ## Background
 
