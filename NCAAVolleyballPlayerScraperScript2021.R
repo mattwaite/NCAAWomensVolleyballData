@@ -13,9 +13,11 @@ playerurls <- tibble()
 playermatchstatstibble = tibble()
 playercareerstatstibble = tibble()
 
+playerurlfilename <- paste0("url_csvs/ncaa_volleyball_playermatchstaturls_", season, ".csv")
 playermatchstatsfilename <- paste0("data/ncaa_volleyball_playermatchstats_", season, ".csv")
-
 playercareerstatsfilename <- paste0("data/ncaa_volleyball_playercareerstats_", season, ".csv")
+
+
 
 for (i in urls){
   
@@ -36,8 +38,14 @@ for (i in urls){
   
   playerurls <- bind_rows(playerurls, playermatchurllist)
   
+  message <- paste0("Fetching URLs for ", schoolfull)
+  
+  print(message)
+  
   Sys.sleep(2)
 }
+
+write_csv(playerurls, playerurlfilename)
 
 playermatchurls <- pull(playerurls, 1)
 
@@ -59,11 +67,17 @@ for (i in playermatchurls){
   
   playermatchstats <- playermatchstats[[1]] %>% slice(3:n()) %>% filter(X2 != "Defensive Totals") %>% row_to_names(row_number = 1) %>% remove_empty(which="cols") %>% mutate(Date = mdy(Date), HomeAway = case_when(grepl("@",Opponent) ~ "Away", TRUE ~ "Home"), Opponent = gsub("@ ","",Opponent), WinLoss = case_when(grepl("L", Result) ~ "Loss", grepl("W", Result) ~ "Win"), Result = gsub("L ", "", Result), Result = gsub("W ", "", Result)) %>% separate(Result, into=c("VisitorScore", "HomeScore")) %>% rename(Result = WinLoss) %>% mutate(Team = schoolfull, Player = playerfull) %>% clean_names() %>% mutate_at(vars(-date, -opponent, -home_away, -result, -team, -player), ~str_replace(., "/", "")) %>% mutate_at(vars(-date, -opponent, -home_away, -result, -team, -player), ~str_replace(., ",", "")) %>% mutate_at(vars(-date, -opponent, -home_away, -result, -team, -player), as.numeric) %>% separate(player, into=c("player", "remaining"), sep=" #") %>% separate(remaining, into=c("jersey", "position"), sep=" ") %>% select(date, team, player, jersey, position, opponent, home_away, result, everything())  
 
+  message <- paste0("Fetching ", playerfull, " on ", schoolfull)
+  
+  print(message)
+  
   tryCatch(playercareerstatstibble <- bind_rows(playercareerstatstibble, playercareerstats),
            error = function(e){NA})
   
   tryCatch(playermatchstatstibble <- bind_rows(playermatchstatstibble, playermatchstats),
            error = function(e){NA})
+  
+  Sys.sleep(2)
 }
 
 playercareerstatstibble <- playercareerstatstibble %>% remove_empty(which=c("rows", "cols"))
